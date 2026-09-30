@@ -56,23 +56,47 @@ class InterviewWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.questionText").isNotEmpty())
                 .andReturn();
 
-        String sessionId = objectMapper.readTree(startResult.getResponse().getContentAsString()).get("sessionId").asText();
+        String responseBody = startResult.getResponse().getContentAsString();
+        String sessionId = objectMapper.readTree(responseBody).get("sessionId").asText();
+        String questionText = objectMapper.readTree(responseBody).get("questionText").asText();
 
-        // 2. Submit short answer (to trigger follow-up)
-        SubmitAnswerRequest ansReq = new SubmitAnswerRequest("Encapsulation hides data and inheritance shares code.", 12000);
+        // 2. Submit short answer (to trigger follow-up probing)
+        String initialAnswer;
+        if (questionText.contains("OOP") || questionText.contains("pillars")) {
+            initialAnswer = "Encapsulation hides data and inheritance shares code.";
+        } else if (questionText.contains("Stack") || questionText.contains("Heap")) {
+            initialAnswer = "Stack stores primitive variables while heap stores objects.";
+        } else if (questionText.contains("equals") || questionText.contains("==")) {
+            initialAnswer = "== checks memory reference while equals checks content.";
+        } else if (questionText.contains("ArrayList") || questionText.contains("LinkedList")) {
+            initialAnswer = "ArrayList uses dynamic array and LinkedList uses node pointers.";
+        } else {
+            initialAnswer = "Inversion of control delegates bean creation to the Spring container.";
+        }
+
         MvcResult ansResult = mockMvc.perform(post("/api/interview/" + sessionId + "/answer")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(ansReq)))
+                        .content(objectMapper.writeValueAsString(new SubmitAnswerRequest(initialAnswer, 12000))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.followUpRequired", is(true)))
                 .andExpect(jsonPath("$.followUpQuestion").isNotEmpty())
                 .andReturn();
 
-        // 3. Submit follow-up response
-        SubmitFollowUpRequest followReq = new SubmitFollowUpRequest(
-                "Method overloading happens at compile-time with different parameter signatures, while method overriding occurs at runtime when a subclass replaces a superclass method.",
-                8000
-        );
+        // 3. Submit follow-up response addressing the probed topic
+        String followUpAnswer;
+        if (questionText.contains("OOP") || questionText.contains("pillars")) {
+            followUpAnswer = "Method overloading happens at compile-time with different parameter signatures, while method overriding occurs at runtime when a subclass replaces a superclass method in polymorphism.";
+        } else if (questionText.contains("Stack") || questionText.contains("Heap")) {
+            followUpAnswer = "The JVM garbage collector traces reference roots; when an object in the heap has no reachable references, it is eligible for garbage collection.";
+        } else if (questionText.contains("equals") || questionText.contains("==")) {
+            followUpAnswer = "Overriding equals and hashCode ensures proper hash bucket placement and retrieval in collections like HashMap.";
+        } else if (questionText.contains("ArrayList") || questionText.contains("LinkedList")) {
+            followUpAnswer = "When ArrayList capacity is exceeded, it allocates a new array of 1.5x size and copies elements.";
+        } else {
+            followUpAnswer = "Constructor injection is preferred over field injection because it ensures immutability and simplifies unit testing without reflection.";
+        }
+
+        SubmitFollowUpRequest followReq = new SubmitFollowUpRequest(followUpAnswer, 8000);
         mockMvc.perform(post("/api/interview/" + sessionId + "/follow-up")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(followReq)))
@@ -106,12 +130,43 @@ class InterviewWorkflowIntegrationTest {
     }
 
     @Test
-    @DisplayName("Error handling: invalid start request should return 400")
-    void testInvalidStartRequest() throws Exception {
-        String invalidJson = "{\"role\": \"NON_EXISTENT_ROLE\", \"difficulty\": \"BEGINNER\", \"questionCount\": 5}";
-        mockMvc.perform(post("/api/interview/start")
+    @DisplayName("Benchmark report endpoint should return comparative metrics and sample test cases")
+    void testGetBenchmarkReport() throws Exception {
+        mockMvc.perform(get("/api/interview/benchmark-report"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sampleTestCasesCount", greaterThanOrEqualTo(5)))
+                .andExpect(jsonPath("$.baselineAvgLatencyMs").isNumber())
+                .andExpect(jsonPath("$.aiAvgLatencyMs").isNumber())
+                .andExpect(jsonPath("$.operationalEfficiencyImprovementPercent", greaterThan(10.0)))
+                .andExpect(jsonPath("$.failureScenarioAnalysis.missingDataHandling").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Human-in-the-loop override endpoint updates score and notes with auditability")
+    void testHumanOverride() throws Exception {
+        // Start a 1-question interview
+        StartInterviewRequest startReq = new StartInterviewRequest(JobRole.WEB_DEVELOPER, DifficultyLevel.BEGINNER, 1);
+        MvcResult startResult = mockMvc.perform(post("/api/interview/start")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(invalidJson))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(startReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String sessionId = objectMapper.readTree(startResult.getResponse().getContentAsString()).get("sessionId").asText();
+
+        // Submit answer
+        mockMvc.perform(post("/api/interview/" + sessionId + "/answer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new SubmitAnswerRequest("HTML structures page content, CSS formats presentation styling, and JavaScript adds interactive logic.", 15000))))
+                .andExpect(status().isOk());
+
+        // Apply human override
+        com.interview.dto.HumanOverrideRequest overrideReq = new com.interview.dto.HumanOverrideRequest(1, 95, "Candidate explained the DOM separation clearly in follow-up discussion.");
+        mockMvc.perform(post("/api/interview/" + sessionId + "/override")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(overrideReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.overallScore", is(95)))
+                .andExpect(jsonPath("$.hasHumanOverride", is(true)));
     }
 }

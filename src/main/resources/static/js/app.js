@@ -1,9 +1,10 @@
-// AI Interview Practice Agent - Frontend Logic (Milestone 35%)
+// AI Interview Practice Agent - Frontend Logic (100% Complete Implementation)
 document.addEventListener('DOMContentLoaded', () => {
-  // State
+  // Application State
   let appConfig = null;
   let selectedRole = 'JAVA_DEVELOPER';
   let selectedDifficulty = 'INTERMEDIATE';
+  let selectedEngine = 'AI_HYBRID'; // Default AI Semantic Engine
   let questionCount = 5;
 
   let currentSessionId = null;
@@ -11,6 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
   let isAwaitingFollowUp = false;
   let questionStartTime = null;
   let timerInterval = null;
+  let currentSummaryData = null;
+
+  // Speech Recognition & Synthesis State
+  let speechRecognition = null;
+  let isListening = false;
+  let currentSpeechUtterance = null;
 
   // DOM Elements - Views
   const viewSetup = document.getElementById('view-setup');
@@ -35,12 +42,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const activeQuestionTopic = document.getElementById('active-question-topic');
   const activeQuestionText = document.getElementById('active-question-text');
+  const btnSpeakQuestion = document.getElementById('btn-speak-question');
+
   const followUpBox = document.getElementById('follow-up-box');
   const followUpText = document.getElementById('follow-up-text');
   const followUpReason = document.getElementById('follow-up-reason');
+  const btnSpeakFollowup = document.getElementById('btn-speak-followup');
 
   const answerLabel = document.getElementById('answer-label');
   const candidateAnswerInput = document.getElementById('candidate-answer-input');
+  const btnVoiceInput = document.getElementById('btn-voice-input');
   const wordCountLabel = document.getElementById('word-count-label');
   const btnSubmitAnswer = document.getElementById('btn-submit-answer');
 
@@ -70,6 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const finalImprovementsList = document.getElementById('final-improvements-list');
   const breakdownContainer = document.getElementById('breakdown-container');
   const btnRestartInterview = document.getElementById('btn-restart-interview');
+  const btnExportJson = document.getElementById('btn-export-json');
+  const btnPrintReport = document.getElementById('btn-print-report');
 
   // DOM Elements - Baseline Modal
   const btnShowBaseline = document.getElementById('btn-show-baseline');
@@ -80,6 +93,134 @@ document.addEventListener('DOMContentLoaded', () => {
   const baseAnswersEvaluated = document.getElementById('base-answers-evaluated');
   const baseFollowupRate = document.getElementById('base-followup-rate');
   const baseEngineModel = document.getElementById('base-engine-model');
+
+  // DOM Elements - Benchmark Modal
+  const btnShowBenchmark = document.getElementById('btn-show-benchmark');
+  const benchmarkModal = document.getElementById('benchmark-modal');
+  const btnCloseBenchmark = document.getElementById('btn-close-benchmark');
+  const benchEfficiency = document.getElementById('bench-efficiency');
+  const benchAccuracy = document.getElementById('bench-accuracy');
+  const benchReduction = document.getElementById('bench-reduction');
+  const tableBaseLat = document.getElementById('table-base-lat');
+  const tableAiLat = document.getElementById('table-ai-lat');
+  const failureScenariosContainer = document.getElementById('failure-scenarios-container');
+  const testCasesAccordion = document.getElementById('test-cases-accordion');
+
+  // DOM Elements - Human Override Modal
+  const overrideModal = document.getElementById('override-modal');
+  const btnCloseOverride = document.getElementById('btn-close-override');
+  const btnCancelOverride = document.getElementById('btn-cancel-override');
+  const btnConfirmOverride = document.getElementById('btn-confirm-override');
+  const overrideQTitle = document.getElementById('override-q-title');
+  const overrideScoreInput = document.getElementById('override-score-input');
+  const overrideNotesInput = document.getElementById('override-notes-input');
+  let activeOverrideQuestionNum = 1;
+
+  // Initialize Web Speech API
+  initSpeechSynthesisAndRecognition();
+
+  function initSpeechSynthesisAndRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      speechRecognition = new SpeechRecognition();
+      speechRecognition.continuous = true;
+      speechRecognition.interimResults = true;
+      speechRecognition.lang = 'en-US';
+
+      speechRecognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript) {
+          candidateAnswerInput.value = (candidateAnswerInput.value + ' ' + transcript).trim();
+          updateWordCount();
+        }
+      };
+
+      speechRecognition.onerror = (event) => {
+        console.warn('Speech recognition error:', event.error);
+        stopVoiceDictation();
+      };
+
+      speechRecognition.onend = () => {
+        if (isListening) {
+          stopVoiceDictation();
+        }
+      };
+    } else {
+      if (btnVoiceInput) {
+        btnVoiceInput.title = 'Web Speech Recognition not supported in this browser';
+      }
+    }
+  }
+
+  function startVoiceDictation() {
+    if (!speechRecognition) {
+      showToast('Speech-to-Text is not supported by your browser. Please type your answer.');
+      return;
+    }
+    try {
+      speechRecognition.start();
+      isListening = true;
+      btnVoiceInput.classList.add('active-listening');
+      btnVoiceInput.innerHTML = '🛑 Listening... (Click to stop)';
+      showToast('Microphone active: Speak your answer clearly.');
+    } catch (e) {
+      console.error(e);
+      stopVoiceDictation();
+    }
+  }
+
+  function stopVoiceDictation() {
+    if (speechRecognition && isListening) {
+      try {
+        speechRecognition.stop();
+      } catch (e) {}
+    }
+    isListening = false;
+    if (btnVoiceInput) {
+      btnVoiceInput.classList.remove('active-listening');
+      btnVoiceInput.innerHTML = '🎤 Dictate Answer (Voice)';
+    }
+  }
+
+  function speakTextAloud(text) {
+    if (!('speechSynthesis' in window)) {
+      showToast('Text-to-Speech is not supported by your browser.');
+      return;
+    }
+    window.speechSynthesis.cancel(); // Stop any active utterance
+    if (!text) return;
+
+    currentSpeechUtterance = new SpeechSynthesisUtterance(text);
+    currentSpeechUtterance.rate = 1.0;
+    currentSpeechUtterance.pitch = 1.0;
+    currentSpeechUtterance.lang = 'en-US';
+    window.speechSynthesis.speak(currentSpeechUtterance);
+  }
+
+  if (btnVoiceInput) {
+    btnVoiceInput.addEventListener('click', () => {
+      if (isListening) {
+        stopVoiceDictation();
+      } else {
+        startVoiceDictation();
+      }
+    });
+  }
+
+  if (btnSpeakQuestion) {
+    btnSpeakQuestion.addEventListener('click', () => {
+      speakTextAloud(activeQuestionText.textContent);
+    });
+  }
+
+  if (btnSpeakFollowup) {
+    btnSpeakFollowup.addEventListener('click', () => {
+      speakTextAloud(followUpText.textContent);
+    });
+  }
 
   // Load Configuration
   async function loadConfig() {
@@ -95,6 +236,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderSetupOptions(config) {
+    // Engine selector cards
+    document.querySelectorAll('.engine-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.engine-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedEngine = card.getAttribute('data-engine');
+      });
+    });
+
     // Render Roles
     roleGrid.innerHTML = '';
     config.roles.forEach(role => {
@@ -130,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Question Counter Controls
+  // Question Count Buttons
   btnDecCount.addEventListener('click', () => {
     if (questionCount > 1) {
       questionCount--;
@@ -148,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Start Interview Action
   btnStartInterview.addEventListener('click', async () => {
     btnStartInterview.disabled = true;
-    btnStartInterview.textContent = 'Initializing Session...';
+    btnStartInterview.textContent = 'Initializing AI Session...';
 
     try {
       const res = await fetch('/api/interview/start', {
@@ -157,7 +307,8 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({
           role: selectedRole,
           difficulty: selectedDifficulty,
-          questionCount: questionCount
+          questionCount: questionCount,
+          engineType: selectedEngine
         })
       });
 
@@ -181,6 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function displayQuestion(qData) {
     currentQuestion = qData;
     isAwaitingFollowUp = false;
+    stopVoiceDictation();
 
     // Reset UI fields
     followUpBox.style.display = 'none';
@@ -190,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnSubmitAnswer.textContent = 'Submit Answer for Evaluation ⚡';
     candidateAnswerInput.value = '';
     candidateAnswerInput.disabled = false;
-    candidateAnswerInput.placeholder = 'Type your structured technical answer here. Be thorough with concepts, trade-offs, and examples...';
+    candidateAnswerInput.placeholder = 'Type or use your voice to provide a structured technical answer. Be thorough with concepts, trade-offs, and examples...';
     answerLabel.textContent = 'Your Technical Response';
     wordCountLabel.textContent = '0 words';
 
@@ -213,26 +365,29 @@ document.addEventListener('DOMContentLoaded', () => {
     startTimer();
   }
 
-  // Word counter
-  candidateAnswerInput.addEventListener('input', () => {
+  function updateWordCount() {
     const text = candidateAnswerInput.value.trim();
     const words = text ? text.split(/\s+/).length : 0;
     wordCountLabel.textContent = `${words} words`;
-  });
+  }
+
+  // Word counter
+  candidateAnswerInput.addEventListener('input', updateWordCount);
 
   // Submit Answer
   btnSubmitAnswer.addEventListener('click', async () => {
+    stopVoiceDictation();
     const rawAnswer = candidateAnswerInput.value.trim();
 
-    // Basic Validation: Warn on empty answers
+    // Empty answer check
     if (!rawAnswer) {
-      showToast('Please enter an answer before submitting. Empty answers receive 0 points.');
+      showToast('Please enter or dictate an answer before submitting. Empty answers receive 0 points.');
       return;
     }
 
     const responseDuration = Date.now() - questionStartTime;
     btnSubmitAnswer.disabled = true;
-    btnSubmitAnswer.textContent = 'Evaluating with Rule-Based Rubric...';
+    btnSubmitAnswer.textContent = 'Evaluating with AI Engine...';
 
     try {
       let res;
@@ -265,10 +420,8 @@ document.addEventListener('DOMContentLoaded', () => {
       stopTimer();
 
       if (evalData.followUpRequired) {
-        // Trigger Follow-up flow
         handleFollowUpTrigger(evalData);
       } else {
-        // Show standard immediate feedback
         displayFeedback(evalData);
       }
     } catch (err) {
@@ -280,11 +433,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function handleFollowUpTrigger(evalData) {
     isAwaitingFollowUp = true;
-    showToast('Follow-up probing question triggered based on your response.');
+    showToast('Probing follow-up question triggered to explore candidate depth.');
 
     followUpBox.style.display = 'block';
     followUpText.textContent = evalData.followUpQuestion;
-    followUpReason.textContent = `Trigger rationale: ${evalData.followUpReason}`;
+    followUpReason.textContent = `Trigger Rationale: ${evalData.followUpReason}`;
 
     // Reset input for follow up answer
     candidateAnswerInput.value = '';
@@ -347,10 +500,15 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    feedbackExplanationText.textContent = evalResult.explanation;
+    // Explanation & Evidence
+    let explanationMarkup = evalResult.explanation;
+    if (evalResult.confidence) {
+      explanationMarkup += ` (Calibrated Confidence: ${(evalResult.confidence * 100).toFixed(0)}%)`;
+    }
+    feedbackExplanationText.textContent = explanationMarkup;
 
     if (evalData.finished) {
-      btnNextQuestion.textContent = 'View Final Interview Results 🏆';
+      btnNextQuestion.textContent = 'View Final Comprehensive Evaluation 🏆';
     } else {
       btnNextQuestion.textContent = 'Proceed to Next Question ➔';
     }
@@ -380,6 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`/api/interview/${currentSessionId}/result`);
       if (!res.ok) throw new Error('Failed to retrieve interview results');
       const summary = await res.json();
+      currentSummaryData = summary;
       displaySummary(summary);
     } catch (err) {
       showToast(err.message);
@@ -388,10 +547,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function displaySummary(summary) {
     showView('result');
+    currentSummaryData = summary;
 
     finalScoreVal.textContent = summary.overallScore;
     finalPerfBadge.textContent = summary.performanceLevel;
-    
+
     // Performance badge styling
     finalPerfBadge.className = 'perf-badge';
     if (summary.overallScore >= 85) finalPerfBadge.classList.add('perf-excellent');
@@ -399,7 +559,8 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (summary.overallScore >= 50) finalPerfBadge.classList.add('perf-fair');
     else finalPerfBadge.classList.add('perf-dev');
 
-    finalSessionMeta.textContent = `Role: ${getRoleDisplayName(summary.role)} | Difficulty: ${getDiffDisplayName(summary.difficulty)} | Duration: ${summary.totalDurationSeconds}s`;
+    const engineName = summary.engineType === 'AI_HYBRID' ? 'AI Hybrid Engine' : (summary.engineType === 'AI_GEMINI' ? 'Gemini LLM' : 'Baseline Rule-Based');
+    finalSessionMeta.textContent = `Role: ${getRoleDisplayName(summary.role)} | Difficulty: ${getDiffDisplayName(summary.difficulty)} | Engine: ${engineName} | Duration: ${summary.totalDurationSeconds}s`;
     finalRecommendationText.textContent = summary.overallRecommendation;
 
     statTotalQ.textContent = summary.answeredQuestions;
@@ -434,19 +595,109 @@ document.addEventListener('DOMContentLoaded', () => {
             <span style="font-weight: 700; color: var(--text-primary);">Q${item.questionNumber}: ${item.topic}</span>
             <div style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">${item.questionText}</div>
           </div>
-          <div style="font-size: 20px; font-weight: 800; color: ${item.score >= 70 ? 'var(--accent-emerald)' : 'var(--accent-amber)'};">
-            ${item.score}/100
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <button class="btn-override-sm" data-qnum="${item.questionNumber}">
+              ⚖️ Override Score
+            </button>
+            <div style="font-size: 20px; font-weight: 800; color: ${item.score >= 70 ? 'var(--accent-emerald)' : 'var(--accent-amber)'};">
+              ${item.score}/100
+            </div>
           </div>
         </div>
         <div class="breakdown-content">
           <div style="margin-bottom: 8px;"><strong>Candidate Answer:</strong> <span style="color: var(--text-secondary);">${item.candidateAnswer}</span></div>
           ${item.hadFollowUp ? `<div style="margin-bottom: 8px; color: #fbbf24;"><strong>Follow-up Probed:</strong> ${item.followUpQuestion}<br><strong>Clarification:</strong> ${item.followUpAnswer || 'None'}</div>` : ''}
-          <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">${item.explanation}</div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">${item.explanation} ${item.humanOverridden ? '<strong>(Adjusted via Human Override)</strong>' : ''}</div>
         </div>
       `;
+
+      const overrideBtn = card.querySelector('.btn-override-sm');
+      overrideBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openHumanOverrideModal(item);
+      });
+
       breakdownContainer.appendChild(card);
     });
   }
+
+  // Open Human Override Modal
+  function openHumanOverrideModal(item) {
+    activeOverrideQuestionNum = item.questionNumber;
+    overrideQTitle.textContent = `Q${item.questionNumber}: ${item.topic} (Current Score: ${item.score}/100)`;
+    overrideScoreInput.value = item.score;
+    overrideNotesInput.value = '';
+    overrideModal.style.display = 'flex';
+  }
+
+  // Confirm Human Override
+  btnConfirmOverride.addEventListener('click', async () => {
+    const newScore = parseInt(overrideScoreInput.value, 10);
+    const notes = overrideNotesInput.value.trim();
+
+    if (isNaN(newScore) || newScore < 0 || newScore > 100) {
+      showToast('Please provide a valid score between 0 and 100.');
+      return;
+    }
+    if (!notes) {
+      showToast('Auditor justification notes are required for human override.');
+      return;
+    }
+
+    try {
+      btnConfirmOverride.disabled = true;
+      btnConfirmOverride.textContent = 'Saving Override...';
+
+      const res = await fetch(`/api/interview/${currentSessionId}/override`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionNumber: activeOverrideQuestionNum,
+          adjustedScore: newScore,
+          overrideNotes: notes
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to apply human override');
+      }
+
+      const updatedSummary = await res.json();
+      overrideModal.style.display = 'none';
+      showToast('Human score override recorded successfully.');
+      displaySummary(updatedSummary);
+    } catch (e) {
+      showToast(e.message);
+    } finally {
+      btnConfirmOverride.disabled = false;
+      btnConfirmOverride.textContent = 'Save Human Override ✍️';
+    }
+  });
+
+  btnCloseOverride.addEventListener('click', () => overrideModal.style.display = 'none');
+  btnCancelOverride.addEventListener('click', () => overrideModal.style.display = 'none');
+
+  // Export JSON Report
+  btnExportJson.addEventListener('click', () => {
+    if (!currentSummaryData) {
+      showToast('No summary data available to download.');
+      return;
+    }
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(currentSummaryData, null, 2));
+    const dlAnchor = document.createElement('a');
+    dlAnchor.setAttribute('href', dataStr);
+    dlAnchor.setAttribute('download', `interview-evaluation-report-${currentSummaryData.sessionId}.json`);
+    document.body.appendChild(dlAnchor);
+    dlAnchor.click();
+    dlAnchor.remove();
+    showToast('Evaluation report JSON downloaded successfully.');
+  });
+
+  // Print / Save PDF
+  btnPrintReport.addEventListener('click', () => {
+    window.print();
+  });
 
   // Restart interview
   btnRestartInterview.addEventListener('click', () => {
@@ -473,14 +724,78 @@ document.addEventListener('DOMContentLoaded', () => {
     baselineModal.style.display = 'flex';
   });
 
-  btnCloseBaseline.addEventListener('click', () => {
-    baselineModal.style.display = 'none';
+  btnCloseBaseline.addEventListener('click', () => baselineModal.style.display = 'none');
+
+  // Benchmark Modal Controls
+  btnShowBenchmark.addEventListener('click', async () => {
+    try {
+      btnShowBenchmark.textContent = 'Loading Report...';
+      const res = await fetch('/api/interview/benchmark-report');
+      if (!res.ok) throw new Error('Failed to load benchmark report');
+      const b = await res.json();
+
+      benchEfficiency.textContent = `+${b.operationalEfficiencyImprovementPercent.toFixed(1)}%`;
+      benchAccuracy.textContent = `${b.aiAccuracyEstimate.toFixed(1)}%`;
+      benchReduction.textContent = `-${b.falseAlertReductionPercent.toFixed(1)}%`;
+
+      tableBaseLat.textContent = `~${b.baselineAvgLatencyMs.toFixed(1)} ms`;
+      tableAiLat.textContent = `~${b.aiAvgLatencyMs.toFixed(1)} ms`;
+
+      // Failure Scenarios
+      const fsa = b.failureScenarioAnalysis;
+      failureScenariosContainer.innerHTML = `
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px;">
+          <div style="font-weight: 700; color: #34d399; margin-bottom: 4px;">✓ Missing / Blank Data</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">${fsa.missingDataHandling}</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px;">
+          <div style="font-weight: 700; color: #818cf8; margin-bottom: 4px;">✓ Noisy / Typo Resilience</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">${fsa.noisyInputHandling}</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px;">
+          <div style="font-weight: 700; color: #fbbf24; margin-bottom: 4px;">✓ Adversarial Security Guardrail</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">${fsa.adversarialResilience}</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px;">
+          <div style="font-weight: 700; color: #f43f5e; margin-bottom: 4px;">✓ Human-in-the-Loop Override</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">${fsa.humanOverrideAuditability}</div>
+        </div>
+      `;
+
+      // Sample Test Cases Accordion
+      testCasesAccordion.innerHTML = '';
+      b.testCaseComparisons.forEach(tc => {
+        const item = document.createElement('div');
+        item.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; font-size: 12px;';
+        item.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-weight: 700; color: var(--text-primary); font-family: var(--font-mono);">${tc.testCaseId} [${tc.scenarioType}]</span>
+            <div style="display: flex; gap: 8px;">
+              <span style="background: rgba(156, 163, 175, 0.2); color: #d1d5db; padding: 2px 6px; border-radius: 4px;">Baseline: ${tc.baselineScore}/100</span>
+              <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 2px 6px; border-radius: 4px;">AI: ${tc.aiScore}/100</span>
+            </div>
+          </div>
+          <div style="color: var(--text-secondary); margin-bottom: 4px;"><strong>Answer:</strong> "${tc.candidateAnswer}"</div>
+          <div style="color: var(--text-muted);"><strong>Analysis:</strong> ${tc.outcomeAnalysis}</div>
+        `;
+        testCasesAccordion.appendChild(item);
+      });
+
+      benchmarkModal.style.display = 'flex';
+    } catch (e) {
+      showToast('Error loading benchmark report: ' + e.message);
+    } finally {
+      btnShowBenchmark.textContent = '📈 Comparative Benchmark & Report';
+    }
   });
 
-  baselineModal.addEventListener('click', (e) => {
-    if (e.target === baselineModal) {
-      baselineModal.style.display = 'none';
-    }
+  btnCloseBenchmark.addEventListener('click', () => benchmarkModal.style.display = 'none');
+
+  // Close modals on backdrop click
+  window.addEventListener('click', (e) => {
+    if (e.target === baselineModal) baselineModal.style.display = 'none';
+    if (e.target === benchmarkModal) benchmarkModal.style.display = 'none';
+    if (e.target === overrideModal) overrideModal.style.display = 'none';
   });
 
   // Helpers

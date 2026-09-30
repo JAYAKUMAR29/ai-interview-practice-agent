@@ -18,6 +18,8 @@ public class StartInterviewRequest {
     @Max(value = 10, message = "Interview cannot exceed 10 questions per session")
     private int questionCount = 5;
 
+    private com.interview.model.EvaluationEngineType engineType = com.interview.model.EvaluationEngineType.AI_HYBRID;
+
     public StartInterviewRequest() {
     }
 
@@ -25,6 +27,14 @@ public class StartInterviewRequest {
         this.role = role;
         this.difficulty = difficulty;
         this.questionCount = questionCount;
+        this.engineType = com.interview.model.EvaluationEngineType.AI_HYBRID;
+    }
+
+    public StartInterviewRequest(JobRole role, DifficultyLevel difficulty, int questionCount, com.interview.model.EvaluationEngineType engineType) {
+        this.role = role;
+        this.difficulty = difficulty;
+        this.questionCount = questionCount;
+        this.engineType = engineType;
     }
 
     public JobRole getRole() {
@@ -49,5 +59,13 @@ public class StartInterviewRequest {
 
     public void setQuestionCount(int questionCount) {
         this.questionCount = questionCount;
+    }
+
+    public com.interview.model.EvaluationEngineType getEngineType() {
+        return engineType;
+    }
+
+    public void setEngineType(com.interview.model.EvaluationEngineType engineType) {
+        this.engineType = engineType;
     }
 }

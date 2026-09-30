@@ -17,11 +17,14 @@ public class InterviewController {
 
     private final InterviewSessionService interviewSessionService;
     private final BaselineMetricsService baselineMetricsService;
+    private final com.interview.service.EvaluationBenchmarkService evaluationBenchmarkService;
 
     public InterviewController(InterviewSessionService interviewSessionService,
-                               BaselineMetricsService baselineMetricsService) {
+                               BaselineMetricsService baselineMetricsService,
+                               com.interview.service.EvaluationBenchmarkService evaluationBenchmarkService) {
         this.interviewSessionService = interviewSessionService;
         this.baselineMetricsService = baselineMetricsService;
+        this.evaluationBenchmarkService = evaluationBenchmarkService;
     }
 
     /**
@@ -83,10 +86,32 @@ public class InterviewController {
     }
 
     /**
+     * Applies human interviewer override for a specific question score with audit justification.
+     */
+    @PostMapping("/{sessionId}/override")
+    public ResponseEntity<InterviewSummary> applyOverride(
+            @PathVariable String sessionId,
+            @Valid @RequestBody HumanOverrideRequest request) {
+        InterviewSummary updated = interviewSessionService.applyHumanOverride(sessionId, request);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
      * Retrieves baseline measurements (evaluation latencies, session statistics, completion rates).
      */
     @GetMapping("/baseline-metrics")
     public ResponseEntity<BaselineMetricsDTO> getBaselineMetrics() {
         return ResponseEntity.ok(baselineMetricsService.getMetrics());
+    }
+
+    /**
+     * Generates comprehensive Comparative Evaluation & Benchmark Report
+     * comparing the baseline rule-based rubric vs. the advanced AI evaluation engine
+     * across normal, noisy, brief, and adversarial test scenarios.
+     */
+    @GetMapping("/benchmark-report")
+    public ResponseEntity<BenchmarkComparisonReportDTO> getBenchmarkReport() {
+        BenchmarkComparisonReportDTO report = evaluationBenchmarkService.generateComparisonReport();
+        return ResponseEntity.ok(report);
     }
 }

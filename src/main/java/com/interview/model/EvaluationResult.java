@@ -135,4 +135,60 @@ public class EvaluationResult {
     public void setSuggestedFollowUpQuestion(String suggestedFollowUpQuestion) {
         this.suggestedFollowUpQuestion = suggestedFollowUpQuestion;
     }
+
+    // Extended AI Engine metadata
+    private double confidence = 0.95; // 0.0 - 1.0 confidence score
+    private EvaluationEngineType engineUsed = EvaluationEngineType.RULE_BASED;
+    private boolean offTopicDetected = false;
+    private boolean humanOverridden = false;
+    private String humanOverrideNotes;
+    private List<String> keyEvidencePoints = new ArrayList<>();
+
+    public double getConfidence() {
+        return confidence;
+    }
+
+    public void setConfidence(double confidence) {
+        this.confidence = confidence;
+    }
+
+    public EvaluationEngineType getEngineUsed() {
+        return engineUsed;
+    }
+
+    public void setEngineUsed(EvaluationEngineType engineUsed) {
+        this.engineUsed = engineUsed;
+    }
+
+    public boolean isOffTopicDetected() {
+        return offTopicDetected;
+    }
+
+    public void setOffTopicDetected(boolean offTopicDetected) {
+        this.offTopicDetected = offTopicDetected;
+    }
+
+    public boolean isHumanOverridden() {
+        return humanOverridden;
+    }
+
+    public void setHumanOverridden(boolean humanOverridden) {
+        this.humanOverridden = humanOverridden;
+    }
+
+    public String getHumanOverrideNotes() {
+        return humanOverrideNotes;
+    }
+
+    public void setHumanOverrideNotes(String humanOverrideNotes) {
+        this.humanOverrideNotes = humanOverrideNotes;
+    }
+
+    public List<String> getKeyEvidencePoints() {
+        return keyEvidencePoints;
+    }
+
+    public void setKeyEvidencePoints(List<String> keyEvidencePoints) {
+        this.keyEvidencePoints = keyEvidencePoints;
+    }
 }

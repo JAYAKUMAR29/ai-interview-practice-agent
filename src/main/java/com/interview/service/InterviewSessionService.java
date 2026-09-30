@@ -16,16 +16,19 @@ public class InterviewSessionService {
 
     private final InterviewSessionRepository sessionRepository;
     private final QuestionProvider questionProvider;
-    private final AnswerEvaluator answerEvaluator;
+    private final AnswerEvaluator answerEvaluator; // baseline rule-based
+    private final AdvancedAIEvaluator advancedAIEvaluator; // AI hybrid / Gemini
     private final BaselineMetricsService baselineMetricsService;
 
     public InterviewSessionService(InterviewSessionRepository sessionRepository,
                                    QuestionProvider questionProvider,
                                    AnswerEvaluator answerEvaluator,
+                                   AdvancedAIEvaluator advancedAIEvaluator,
                                    BaselineMetricsService baselineMetricsService) {
         this.sessionRepository = sessionRepository;
         this.questionProvider = questionProvider;
         this.answerEvaluator = answerEvaluator;
+        this.advancedAIEvaluator = advancedAIEvaluator;
         this.baselineMetricsService = baselineMetricsService;
     }
 
@@ -41,7 +44,13 @@ public class InterviewSessionService {
         List<Question> selectedQuestions = questionProvider.selectQuestions(request.getRole(), request.getDifficulty(), count);
 
         String sessionId = UUID.randomUUID().toString();
-        InterviewSession session = new InterviewSession(sessionId, request.getRole(), request.getDifficulty(), selectedQuestions.size());
+        InterviewSession session = new InterviewSession(
+                sessionId,
+                request.getRole(),
+                request.getDifficulty(),
+                selectedQuestions.size(),
+                request.getEngineType()
+        );
         session.setSelectedQuestions(selectedQuestions);
 
         sessionRepository.save(session);
@@ -90,7 +99,13 @@ public class InterviewSessionService {
         }
 
         long startEval = System.currentTimeMillis();
-        EvaluationResult evaluation = answerEvaluator.evaluate(currentQ, request.getAnswer());
+        EvaluationResult evaluation;
+        if (session.getEngineType() == EvaluationEngineType.RULE_BASED) {
+            evaluation = answerEvaluator.evaluate(currentQ, request.getAnswer());
+            evaluation.setEngineUsed(EvaluationEngineType.RULE_BASED);
+        } else {
+            evaluation = advancedAIEvaluator.evaluateAnswer(currentQ, request.getAnswer());
+        }
         long evalDuration = System.currentTimeMillis() - startEval;
 
         // Record in session
@@ -167,13 +182,25 @@ public class InterviewSessionService {
         }
 
         long startEval = System.currentTimeMillis();
-        EvaluationResult finalEval = answerEvaluator.evaluateWithFollowUp(
-                currentResp.getQuestion(),
-                currentResp.getCandidateAnswer(),
-                currentResp.getFollowUpQuestion(),
-                request.getFollowUpAnswer(),
-                currentResp.getInitialEvaluation()
-        );
+        EvaluationResult finalEval;
+        if (session.getEngineType() == EvaluationEngineType.RULE_BASED) {
+            finalEval = answerEvaluator.evaluateWithFollowUp(
+                    currentResp.getQuestion(),
+                    currentResp.getCandidateAnswer(),
+                    currentResp.getFollowUpQuestion(),
+                    request.getFollowUpAnswer(),
+                    currentResp.getInitialEvaluation()
+            );
+            finalEval.setEngineUsed(EvaluationEngineType.RULE_BASED);
+        } else {
+            finalEval = advancedAIEvaluator.evaluateWithFollowUp(
+                    currentResp.getQuestion(),
+                    currentResp.getCandidateAnswer(),
+                    currentResp.getFollowUpQuestion(),
+                    request.getFollowUpAnswer(),
+                    currentResp.getInitialEvaluation()
+            );
+        }
         long evalDuration = System.currentTimeMillis() - startEval;
 
         currentResp.setFollowUpAnswer(request.getFollowUpAnswer());
@@ -262,6 +289,9 @@ public class InterviewSessionService {
             item.setStrengths(eval.getStrengths());
             item.setImprovements(eval.getAreasForImprovement());
             item.setExplanation(eval.getExplanation());
+            item.setConfidence(eval.getConfidence());
+            item.setOffTopicDetected(eval.isOffTopicDetected());
+            item.setHumanOverridden(eval.isHumanOverridden());
 
             strengthsAgg.addAll(eval.getStrengths());
             improvementsAgg.addAll(eval.getAreasForImprovement());
@@ -271,11 +301,16 @@ public class InterviewSessionService {
         int totalAnswered = session.getResponses().size();
         int overallScore = Math.round((float) scoreSum / totalAnswered);
         summary.setOverallScore(overallScore);
+        summary.setEngineType(session.getEngineType());
         summary.setAvgRelevance((double) relevanceSum / totalAnswered);
         summary.setAvgKeywordMatch((double) keywordSum / totalAnswered);
         summary.setAvgCompleteness((double) completenessSum / totalAnswered);
         summary.setAvgLengthClarity((double) lengthClaritySum / totalAnswered);
         summary.setAvgResponseTimeSeconds((double) totalResponseTimeMs / (totalAnswered * 1000.0));
+
+        double avgConf = items.stream().mapToDouble(InterviewSummary.QuestionSummaryItem::getConfidence).average().orElse(0.95);
+        summary.setAvgConfidence(Math.round(avgConf * 100.0) / 100.0);
+        summary.setHasHumanOverride(items.stream().anyMatch(InterviewSummary.QuestionSummaryItem::isHumanOverridden));
 
         summary.setQuestionBreakdown(items);
         summary.setKeyStrengths(new ArrayList<>(strengthsAgg).subList(0, Math.min(4, strengthsAgg.size())));
@@ -297,6 +332,25 @@ public class InterviewSessionService {
         }
 
         return summary;
+    }
+
+    public InterviewSummary applyHumanOverride(String sessionId, HumanOverrideRequest overrideReq) {
+        InterviewSession session = getSessionOrThrow(sessionId);
+        int qIdx = overrideReq.getQuestionNumber() - 1;
+        if (qIdx < 0 || qIdx >= session.getResponses().size()) {
+            throw new InvalidRequestException("Invalid question number: " + overrideReq.getQuestionNumber());
+        }
+
+        QuestionResponse resp = session.getResponses().get(qIdx);
+        EvaluationResult eval = resp.getFinalEvaluation() != null ? resp.getFinalEvaluation() : resp.getInitialEvaluation();
+
+        eval.setScore(overrideReq.getAdjustedScore());
+        eval.setHumanOverridden(true);
+        eval.setHumanOverrideNotes(overrideReq.getOverrideNotes());
+        eval.getStrengths().add("Human Interviewer Adjusted: " + overrideReq.getOverrideNotes());
+
+        sessionRepository.save(session);
+        return getInterviewSummary(sessionId);
     }
 
     public InterviewSession getSessionOrThrow(String sessionId) {

@@ -18,6 +18,7 @@ public class InterviewSession {
     private int totalQuestions;
     private int currentQuestionIndex; // 0-based
     private SessionStatus status;
+    private EvaluationEngineType engineType = EvaluationEngineType.AI_HYBRID;
 
     private List<Question> selectedQuestions = new ArrayList<>();
     private List<QuestionResponse> responses = new ArrayList<>();
@@ -28,9 +29,14 @@ public class InterviewSession {
     public InterviewSession() {
         this.status = SessionStatus.ACTIVE;
         this.startedAt = Instant.now();
+        this.engineType = EvaluationEngineType.AI_HYBRID;
     }
 
     public InterviewSession(String sessionId, JobRole role, DifficultyLevel difficulty, int totalQuestions) {
+        this(sessionId, role, difficulty, totalQuestions, EvaluationEngineType.AI_HYBRID);
+    }
+
+    public InterviewSession(String sessionId, JobRole role, DifficultyLevel difficulty, int totalQuestions, EvaluationEngineType engineType) {
         this.sessionId = sessionId;
         this.role = role;
         this.difficulty = difficulty;
@@ -38,6 +44,15 @@ public class InterviewSession {
         this.currentQuestionIndex = 0;
         this.status = SessionStatus.ACTIVE;
         this.startedAt = Instant.now();
+        this.engineType = (engineType != null) ? engineType : EvaluationEngineType.AI_HYBRID;
+    }
+
+    public EvaluationEngineType getEngineType() {
+        return engineType;
+    }
+
+    public void setEngineType(EvaluationEngineType engineType) {
+        this.engineType = engineType;
     }
 
     public Question getCurrentQuestion() {

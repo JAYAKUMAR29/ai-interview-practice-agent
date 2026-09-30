@@ -23,6 +23,9 @@ public class InterviewSummary {
 
     private long totalDurationSeconds;
     private double avgResponseTimeSeconds;
+    private EvaluationEngineType engineType = EvaluationEngineType.AI_HYBRID;
+    private double avgConfidence = 0.95;
+    private boolean hasHumanOverride = false;
     private List<QuestionSummaryItem> questionBreakdown = new ArrayList<>();
 
     public static class QuestionSummaryItem {
@@ -135,6 +138,34 @@ public class InterviewSummary {
 
         public void setExplanation(String explanation) {
             this.explanation = explanation;
+        }
+
+        private double confidence = 0.95;
+        private boolean offTopicDetected = false;
+        private boolean humanOverridden = false;
+
+        public double getConfidence() {
+            return confidence;
+        }
+
+        public void setConfidence(double confidence) {
+            this.confidence = confidence;
+        }
+
+        public boolean isOffTopicDetected() {
+            return offTopicDetected;
+        }
+
+        public void setOffTopicDetected(boolean offTopicDetected) {
+            this.offTopicDetected = offTopicDetected;
+        }
+
+        public boolean isHumanOverridden() {
+            return humanOverridden;
+        }
+
+        public void setHumanOverridden(boolean humanOverridden) {
+            this.humanOverridden = humanOverridden;
         }
     }
 
@@ -274,5 +305,29 @@ public class InterviewSummary {
 
     public void setQuestionBreakdown(List<QuestionSummaryItem> questionBreakdown) {
         this.questionBreakdown = questionBreakdown;
+    }
+
+    public EvaluationEngineType getEngineType() {
+        return engineType;
+    }
+
+    public void setEngineType(EvaluationEngineType engineType) {
+        this.engineType = engineType;
+    }
+
+    public double getAvgConfidence() {
+        return avgConfidence;
+    }
+
+    public void setAvgConfidence(double avgConfidence) {
+        this.avgConfidence = avgConfidence;
+    }
+
+    public boolean isHasHumanOverride() {
+        return hasHumanOverride;
+    }
+
+    public void setHasHumanOverride(boolean hasHumanOverride) {
+        this.hasHumanOverride = hasHumanOverride;
     }
 }
