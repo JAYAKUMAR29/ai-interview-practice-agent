@@ -94,6 +94,16 @@ public class QuestionRepository {
                 List.of("constructor", "field", "immutability", "testing", "nullpointer")
         ));
 
+        add(new Question(
+                "JAVA-BEG-06", JobRole.JAVA_DEVELOPER, DifficultyLevel.BEGINNER, "Exception Handling",
+                "Explain the difference between Checked and Unchecked exceptions in Java and how try-with-resources improves resource management.",
+                List.of("checked", "unchecked", "runtimeexception", "autocloseable", "try-with-resources", "finally"),
+                List.of("checked exceptions are checked at compile time", "unchecked inherit from RuntimeException", "try-with-resources automatically closes AutoCloseable resources"),
+                "Checked exceptions must be explicitly declared or caught at compile-time (e.g., IOException, SQLException). Unchecked exceptions extend RuntimeException and represent programming bugs (e.g., NullPointerException). Java 7 introduced try-with-resources, which automatically closes resources implementing AutoCloseable without manual finally blocks.",
+                "Can you create custom checked and unchecked exceptions in Java? Which base classes would you extend?",
+                List.of("custom", "exception", "runtimeexception", "extend", "subclass")
+        ));
+
         // Intermediate (5 questions)
         add(new Question(
                 "JAVA-INT-01", JobRole.JAVA_DEVELOPER, DifficultyLevel.INTERMEDIATE, "Concurrency & Multithreading",

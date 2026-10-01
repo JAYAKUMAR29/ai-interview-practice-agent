@@ -22,9 +22,14 @@ An intelligent, role-specific technical interview practice agent built with **Sp
    - Benchmark dashboard (`/api/interview/benchmark-report`) comparing Baseline vs. AI across 7 sample test cases.
    - **+21.4% operational efficiency improvement** (surpassing 10–20% target).
    - **+15.7% accuracy improvement** with **-42.0% false alert reduction**.
-6. **Human-in-the-Loop Governance:**
+6. **Candidate Practice History & Growth Tracker:**
+   - Dedicated modal (`📜 Practice History`) tracking historical scores, completed sessions, average metrics, and most-practiced career track across time via local browser persistence.
+7. **Developer Scaffold & Monospace Code Mode:**
+   - One-click answer scaffolding chips (*Architecture & Trade-offs*, *Production Example*, *Complexity O(n)*, *Edge-Cases & Faults*).
+   - Monospace code mode toggle (`💻 Monospace Code View`) for writing formatted code snippets or architecture diagrams.
+8. **Human-in-the-Loop Governance:**
    - Score calibration endpoint (`/api/interview/{sessionId}/override`) with mandatory auditor justification notes.
-7. **Report Exports:**
+9. **Report Exports:**
    - Instant JSON evaluation download and printable/PDF report generation.
 
 ---

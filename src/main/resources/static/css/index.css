@@ -957,9 +957,56 @@ body {
   gap: 4px;
 }
 
-.btn-override-sm:hover {
-  background: rgba(245, 158, 11, 0.25);
+/* Quick scaffolding chips */
+.answer-quick-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.quick-chip-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-chip-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: var(--primary-light);
+  color: #fff;
   transform: translateY(-1px);
+}
+
+.answer-textarea.code-mode {
+  font-family: var(--font-mono) !important;
+  font-size: 13px !important;
+  background: rgba(15, 23, 42, 0.9) !important;
+  border-color: rgba(99, 102, 241, 0.4) !important;
+}
+
+/* History item cards */
+.history-item-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.history-item-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(99, 102, 241, 0.3);
 }
 
 @media print {

@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const failureScenariosContainer = document.getElementById('failure-scenarios-container');
   const testCasesAccordion = document.getElementById('test-cases-accordion');
 
-  // DOM Elements - Human Override Modal
+   // DOM Elements - Human Override Modal
   const overrideModal = document.getElementById('override-modal');
   const btnCloseOverride = document.getElementById('btn-close-override');
   const btnCancelOverride = document.getElementById('btn-cancel-override');
@@ -115,6 +115,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const overrideScoreInput = document.getElementById('override-score-input');
   const overrideNotesInput = document.getElementById('override-notes-input');
   let activeOverrideQuestionNum = 1;
+
+  // DOM Elements - Scaffolding & Code Mode
+  const btnToggleCodeMode = document.getElementById('btn-toggle-code-mode');
+  const quickChipBtns = document.querySelectorAll('.quick-chip-btn');
+
+  // DOM Elements - Practice History Modal
+  const btnShowHistory = document.getElementById('btn-show-history');
+  const historyModal = document.getElementById('history-modal');
+  const btnCloseHistory = document.getElementById('btn-close-history');
+  const btnCloseHistoryFooter = document.getElementById('btn-close-history-footer');
+  const btnClearHistory = document.getElementById('btn-clear-history');
+  const histTotalSessions = document.getElementById('hist-total-sessions');
+  const histAvgScore = document.getElementById('hist-avg-score');
+  const histBestRole = document.getElementById('hist-best-role');
+  const historyListContainer = document.getElementById('history-list-container');
 
   // Initialize Web Speech API
   initSpeechSynthesisAndRecognition();
@@ -619,6 +634,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       breakdownContainer.appendChild(card);
     });
+
+    // Save session to local browser history
+    saveSessionToHistory(summary);
   }
 
   // Open Human Override Modal
@@ -791,11 +809,149 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnCloseBenchmark.addEventListener('click', () => benchmarkModal.style.display = 'none');
 
+  // Monospace Code Mode Toggle
+  if (btnToggleCodeMode) {
+    btnToggleCodeMode.addEventListener('click', () => {
+      candidateAnswerInput.classList.toggle('code-mode');
+      const isCode = candidateAnswerInput.classList.contains('code-mode');
+      btnToggleCodeMode.textContent = isCode ? '📝 Normal Text View' : '💻 Monospace Code View';
+      btnToggleCodeMode.style.borderColor = isCode ? 'var(--primary-light)' : 'var(--border-color)';
+    });
+  }
+
+  // Quick Scaffold Chips Insertion
+  quickChipBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const insertText = btn.getAttribute('data-insert');
+      if (insertText) {
+        const curVal = candidateAnswerInput.value;
+        const prefix = curVal.length > 0 && !curVal.endsWith('\n') && !curVal.endsWith(' ') ? '\n\n' : '';
+        candidateAnswerInput.value = curVal + prefix + insertText;
+        candidateAnswerInput.focus();
+        updateWordCount();
+      }
+    });
+  });
+
+  // Practice History Modal Handlers
+  if (btnShowHistory) {
+    btnShowHistory.addEventListener('click', renderPracticeHistory);
+  }
+  if (btnCloseHistory) {
+    btnCloseHistory.addEventListener('click', () => historyModal.style.display = 'none');
+  }
+  if (btnCloseHistoryFooter) {
+    btnCloseHistoryFooter.addEventListener('click', () => historyModal.style.display = 'none');
+  }
+  if (btnClearHistory) {
+    btnClearHistory.addEventListener('click', () => {
+      if (confirm('Are you sure you want to clear your local interview practice history?')) {
+        localStorage.removeItem('interview_agent_history');
+        renderPracticeHistory();
+        showToast('Practice history cleared.');
+      }
+    });
+  }
+
+  function getHistoryRecords() {
+    try {
+      const raw = localStorage.getItem('interview_agent_history');
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveSessionToHistory(summary) {
+    try {
+      const records = getHistoryRecords();
+      const newEntry = {
+        sessionId: summary.sessionId,
+        role: summary.role,
+        difficulty: summary.difficulty,
+        overallScore: summary.overallScore,
+        performanceLevel: summary.performanceLevel,
+        answeredQuestions: summary.answeredQuestions,
+        totalDurationSeconds: summary.totalDurationSeconds,
+        engineType: summary.engineType,
+        timestamp: new Date().toISOString()
+      };
+      // Keep most recent 50 sessions
+      records.unshift(newEntry);
+      if (records.length > 50) records.pop();
+      localStorage.setItem('interview_agent_history', JSON.stringify(records));
+    } catch (e) {
+      console.error('Failed to save session history to localStorage', e);
+    }
+  }
+
+  function renderPracticeHistory() {
+    const records = getHistoryRecords();
+    histTotalSessions.textContent = records.length;
+
+    if (records.length === 0) {
+      histAvgScore.textContent = '0/100';
+      histBestRole.textContent = 'None';
+      historyListContainer.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 30px; font-size: 13px;">
+          No completed practice sessions yet. Start an interview to record your results!
+        </div>
+      `;
+      historyModal.style.display = 'flex';
+      return;
+    }
+
+    const avgScore = Math.round(records.reduce((acc, r) => acc + (r.overallScore || 0), 0) / records.length);
+    histAvgScore.textContent = `${avgScore}/100`;
+
+    // Calculate most practiced role
+    const roleCounts = {};
+    records.forEach(r => {
+      roleCounts[r.role] = (roleCounts[r.role] || 0) + 1;
+    });
+    const bestRoleKey = Object.keys(roleCounts).reduce((a, b) => roleCounts[a] > roleCounts[b] ? a : b, records[0].role);
+    histBestRole.textContent = getRoleDisplayName(bestRoleKey);
+
+    // Populate list items
+    historyListContainer.innerHTML = '';
+    records.forEach((rec, idx) => {
+      const d = new Date(rec.timestamp);
+      const dateStr = !isNaN(d.getTime()) ? d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent';
+      const item = document.createElement('div');
+      item.className = 'history-item-card';
+
+      const scoreColor = rec.overallScore >= 70 ? 'var(--accent-emerald)' : (rec.overallScore >= 50 ? 'var(--accent-amber)' : 'var(--accent-rose)');
+
+      item.innerHTML = `
+        <div>
+          <div style="font-weight: 700; color: var(--text-primary); font-size: 14px;">
+            ${getRoleDisplayName(rec.role)} <span style="font-size: 12px; color: var(--text-secondary); font-weight: normal;">• ${getDiffDisplayName(rec.difficulty)}</span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
+            📅 ${dateStr} • ⏱️ ${rec.totalDurationSeconds || 0}s • ${rec.answeredQuestions || 5} Questions • Engine: ${rec.engineType || 'AI'}
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 20px; font-weight: 800; color: ${scoreColor};">
+            ${rec.overallScore}/100
+          </div>
+          <div style="font-size: 11px; color: var(--text-secondary);">
+            ${rec.performanceLevel || 'Completed'}
+          </div>
+        </div>
+      `;
+      historyListContainer.appendChild(item);
+    });
+
+    historyModal.style.display = 'flex';
+  }
+
   // Close modals on backdrop click
   window.addEventListener('click', (e) => {
     if (e.target === baselineModal) baselineModal.style.display = 'none';
     if (e.target === benchmarkModal) benchmarkModal.style.display = 'none';
     if (e.target === overrideModal) overrideModal.style.display = 'none';
+    if (e.target === historyModal) historyModal.style.display = 'none';
   });
 
   // Helpers

@@ -24,6 +24,9 @@
         </div>
       </div>
       <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <button id="btn-show-history" class="baseline-bar-btn" title="View past completed interviews and analytics">
+          📜 Practice History
+        </button>
         <button id="btn-show-benchmark" class="baseline-bar-btn" title="View Baseline vs AI Comparative Metrics and Failure Recovery">
           📈 Comparative Benchmark & Report
         </button>
@@ -146,12 +149,27 @@
 
       <!-- Candidate Answer Area -->
       <div class="answer-area-container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
           <label id="answer-label" class="section-label" for="candidate-answer-input" style="margin-bottom: 0;">Your Technical Response</label>
-          <button id="btn-voice-input" class="speech-ctrl-btn" type="button" title="Speak your response using microphone (Speech-to-Text)">
-            🎤 Dictate Answer (Voice)
-          </button>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button id="btn-toggle-code-mode" class="speech-ctrl-btn" type="button" title="Toggle monospace code formatting mode">
+              💻 Monospace Code View
+            </button>
+            <button id="btn-voice-input" class="speech-ctrl-btn" type="button" title="Speak your response using microphone (Speech-to-Text)">
+              🎤 Dictate Answer (Voice)
+            </button>
+          </div>
         </div>
+
+        <!-- Answer Structure Helper Chips -->
+        <div class="answer-quick-chips">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Quick Scaffold:</span>
+          <button type="button" class="quick-chip-btn" data-insert="In terms of architecture and trade-offs, ">Architecture & Trade-offs</button>
+          <button type="button" class="quick-chip-btn" data-insert="For example, in a production scenario: ">Production Example</button>
+          <button type="button" class="quick-chip-btn" data-insert="From a time and space complexity perspective, ">Complexity (O(n))</button>
+          <button type="button" class="quick-chip-btn" data-insert="To ensure fault tolerance and edge-case handling, ">Edge-Cases & Faults</button>
+        </div>
+
         <textarea id="candidate-answer-input" class="answer-textarea" placeholder="Type or use your voice to provide a structured technical answer. Be thorough with concepts, trade-offs, and examples..."></textarea>
         <div class="textarea-footer">
           <span id="word-count-label">0 words</span>
@@ -450,6 +468,49 @@
       <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5; background: rgba(255, 255, 255, 0.03); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
         <div><strong>Engine Type:</strong> <span id="base-engine-model">Deterministic Rule-Based Rubric</span></div>
         <div style="margin-top: 4px;"><strong>Characteristics:</strong> Sub-millisecond evaluation, zero token cost, reproducible keyword/concept matching.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRACTICE HISTORY MODAL -->
+  <div id="history-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card" style="max-width: 800px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="font-size: 18px; font-weight: 700;">📜 Candidate Practice History & Growth Tracker</h3>
+        <button id="btn-close-history" style="background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
+        Track your score progress over time across different technical roles, difficulty tiers, and evaluation engines. All session records are securely preserved in your local browser sandbox.
+      </p>
+
+      <!-- History Summary Stats -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px;">
+        <div class="stat-card">
+          <div id="hist-total-sessions" class="stat-value" style="color: var(--accent-cyan);">0</div>
+          <div class="stat-title">Completed Sessions</div>
+        </div>
+        <div class="stat-card">
+          <div id="hist-avg-score" class="stat-value" style="color: var(--accent-emerald);">0/100</div>
+          <div class="stat-title">Average Score</div>
+        </div>
+        <div class="stat-card">
+          <div id="hist-best-role" class="stat-value" style="font-size: 16px; color: #818cf8; word-break: break-word;">None</div>
+          <div class="stat-title">Top Role Track</div>
+        </div>
+      </div>
+
+      <!-- History Table / List -->
+      <div id="history-list-container" style="max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+        <!-- Dynamically injected -->
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+        <button id="btn-clear-history" class="speech-ctrl-btn" type="button" style="color: var(--accent-rose); border-color: rgba(244,63,94,0.3);">
+          🗑️ Clear History
+        </button>
+        <button id="btn-close-history-footer" class="btn-secondary" type="button" style="padding: 8px 16px;">
+          Close
+        </button>
       </div>
     </div>
   </div>
